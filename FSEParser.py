@@ -31,7 +31,7 @@ import datetime
 import sqlite3
 import json
 import io
-from time import (gmtime, strftime)
+from time import gmtime, strftime
 from optparse import OptionParser
 import contextlib
 
@@ -43,57 +43,61 @@ try:
     from dfvfs.resolver import resolver
     from dfvfs.lib import raw
     from dfvfs.helpers import source_scanner
+
     DFVFS_IMPORT = True
     IMPORT_ERROR = None
 except ImportError as exp:
     DFVFS_IMPORT = False
-    IMPORT_ERROR =("\n%s\n\
+    IMPORT_ERROR = (
+        "\n%s\n\
         You have specified the source type as image but DFVFS \n\
         is not installed and is required for image support. \n\
         To install DFVFS please refer to \n\
-        http://www.hecfblog.com/2015/12/how-to-install-dfvfs-on-windows-without.html" % (exp))
+        http://www.hecfblog.com/2015/12/how-to-install-dfvfs-on-windows-without.html"
+        % (exp)
+    )
 
-VERSION = '4.1'
+VERSION = "4.1"
 
 EVENTMASK = {
-    0x00000000: 'None;',
-    0x00000001: 'FolderEvent;',
-    0x00000002: 'Mount;',
-    0x00000004: 'Unmount;',
-    0x00000020: 'EndOfTransaction;',
-    0x00000800: 'LastHardLinkRemoved;',
-    0x00001000: 'HardLink;',
-    0x00004000: 'SymbolicLink;',
-    0x00008000: 'FileEvent;',
-    0x00010000: 'PermissionChange;',
-    0x00020000: 'ExtendedAttrModified;',
-    0x00040000: 'ExtendedAttrRemoved;',
-    0x00100000: 'DocumentRevisioning;',
-    0x00400000: 'ItemCloned;',  # macOS HighSierra
-    0x01000000: 'Created;',
-    0x02000000: 'Removed;',
-    0x04000000: 'InodeMetaMod;',
-    0x08000000: 'Renamed;',
-    0x10000000: 'Modified;',
-    0x20000000: 'Exchange;',
-    0x40000000: 'FinderInfoMod;',
-    0x80000000: 'FolderCreated;',
-    0x00000008: 'NOT_USED-0x00000008;',
-    0x00000010: 'NOT_USED-0x00000010;',
-    0x00000040: 'NOT_USED-0x00000040;',
-    0x00000080: 'NOT_USED-0x00000080;',
-    0x00000100: 'NOT_USED-0x00000100;',
-    0x00000200: 'NOT_USED-0x00000200;',
-    0x00000400: 'NOT_USED-0x00000400;',
-    0x00002000: 'NOT_USED-0x00002000;',
-    0x00080000: 'NOT_USED-0x00080000;',
-    0x00200000: 'NOT_USED-0x00200000;',
-    0x00800000: 'NOT_USED-0x00800000;'
+    0x00000000: "None;",
+    0x00000001: "FolderEvent;",
+    0x00000002: "Mount;",
+    0x00000004: "Unmount;",
+    0x00000020: "EndOfTransaction;",
+    0x00000800: "LastHardLinkRemoved;",
+    0x00001000: "HardLink;",
+    0x00004000: "SymbolicLink;",
+    0x00008000: "FileEvent;",
+    0x00010000: "PermissionChange;",
+    0x00020000: "ExtendedAttrModified;",
+    0x00040000: "ExtendedAttrRemoved;",
+    0x00100000: "DocumentRevisioning;",
+    0x00400000: "ItemCloned;",  # macOS HighSierra
+    0x01000000: "Created;",
+    0x02000000: "Removed;",
+    0x04000000: "InodeMetaMod;",
+    0x08000000: "Renamed;",
+    0x10000000: "Modified;",
+    0x20000000: "Exchange;",
+    0x40000000: "FinderInfoMod;",
+    0x80000000: "FolderCreated;",
+    0x00000008: "NOT_USED-0x00000008;",
+    0x00000010: "NOT_USED-0x00000010;",
+    0x00000040: "NOT_USED-0x00000040;",
+    0x00000080: "NOT_USED-0x00000080;",
+    0x00000100: "NOT_USED-0x00000100;",
+    0x00000200: "NOT_USED-0x00000200;",
+    0x00000400: "NOT_USED-0x00000400;",
+    0x00002000: "NOT_USED-0x00002000;",
+    0x00080000: "NOT_USED-0x00080000;",
+    0x00200000: "NOT_USED-0x00200000;",
+    0x00800000: "NOT_USED-0x00800000;",
 }
 
-print('\n==========================================================================')
-print(('FSEParser v {} -- provided by G-C Partners, LLC'.format(VERSION)))
-print('==========================================================================')
+print("\n==========================================================================")
+print(("FSEParser v {} -- provided by G-C Partners, LLC".format(VERSION)))
+print("==========================================================================")
 
 
 def get_options():
@@ -102,39 +106,48 @@ def get_options():
     """
     usage = "usage: %prog -s SOURCE -o OUTDIR -t SOURCETYPE [folder|image] [-c CASENAME -q REPORT_QUERIES]"
     options = OptionParser(usage=usage)
-    options.add_option("-s",
-                       action="store",
-                       type="string",
-                       dest="source",
-                       default=False,
-                       help="REQUIRED. The source directory or image containing fsevent files to be parsed")
-    options.add_option("-o",
-                       action="store",
-                       type="string",
-                       dest="outdir",
-                       default=False,
-                       help="REQUIRED. The destination directory used to store parsed reports")
-    options.add_option("-t",
-                       action="store",
-                       type="string",
-                       dest="sourcetype",
-                       default=False,
-                       help="REQUIRED. The source type to be parsed. Available options are 'folder' or 'image'")
-    options.add_option("-c",
-                       action="store",
-                       type="string",
-                       dest="casename",
-                       default=False,
-                       help="OPTIONAL. The name of the current session, \
-                       used for naming standards. Defaults to 'FSE_Reports'")
-    options.add_option("-q",
-                       action="store",
-                       type="string",
-                       dest="report_queries",
-                       default=False,
-                       help="OPTIONAL. The location of the report_queries.json file \
-                       containing custom report queries to generate targeted reports."
-                       )
+    options.add_option(
+        "-s",
+        action="store",
+        type="string",
+        dest="source",
+        default=False,
+        help="REQUIRED. The source directory or image containing fsevent files to be parsed",
+    )
+    options.add_option(
+        "-o",
+        action="store",
+        type="string",
+        dest="outdir",
+        default=False,
+        help="REQUIRED. The destination directory used to store parsed reports",
+    )
+    options.add_option(
+        "-t",
+        action="store",
+        type="string",
+        dest="sourcetype",
+        default=False,
+        help="REQUIRED. The source type to be parsed. Available options are 'folder' or 'image'",
+    )
+    options.add_option(
+        "-c",
+        action="store",
+        type="string",
+        dest="casename",
+        default=False,
+        help="OPTIONAL. The name of the current session, \
+                       used for naming standards. Defaults to 'FSE_Reports'",
+    )
+    options.add_option(
+        "-q",
+        action="store",
+        type="string",
+        dest="report_queries",
+        default=False,
+        help="OPTIONAL. The location of the report_queries.json file \
+                       containing custom report queries to generate targeted reports.",
+    )
 
     # Return options to caller #
     return options
@@ -150,11 +163,11 @@ def parse_options():
 
     # The meta will store all information about the arguments passed #
     meta = {
-        'casename': opts.casename,
-        'reportqueries': opts.report_queries,
-        'sourcetype': opts.sourcetype,
-        'source': opts.source,
-        'outdir': opts.outdir
+        "casename": opts.casename,
+        "reportqueries": opts.report_queries,
+        "sourcetype": opts.sourcetype,
+        "source": opts.source,
+        "outdir": opts.outdir,
     }
 
     # Print help if no options are provided
@@ -162,33 +175,45 @@ def parse_options():
         options.print_help()
         sys.exit(1)
     # Test required arguments
-    if meta['source'] is False or meta['outdir'] is False or meta['sourcetype'] is False:
-        options.error('Unable to proceed. The following parameters '
-            'are required:\n-s SOURCE\n-o OUTDIR\n-t SOURCETYPE')
+    if (
+        meta["source"] is False
+        or meta["outdir"] is False
+        or meta["sourcetype"] is False
+    ):
+        options.error(
+            "Unable to proceed. The following parameters "
+            "are required:\n-s SOURCE\n-o OUTDIR\n-t SOURCETYPE"
+        )
 
-    if not os.path.exists(meta['source']):
-        options.error("Unable to proceed. \n\n%s does not exist.\n" % meta['source'])
+    if not os.path.exists(meta["source"]):
+        options.error("Unable to proceed. \n\n%s does not exist.\n" % meta["source"])
 
-    if not os.path.exists(meta['outdir']):
-        options.error("Unable to proceed. \n\n%s does not exist.\n" % meta['outdir'])
-        
-    if meta['reportqueries'] and not os.path.exists(meta['reportqueries']):
-        options.error("Unable to proceed. \n\n%s does not exist.\n" % meta['reportqueries'])
+    if not os.path.exists(meta["outdir"]):
+        options.error("Unable to proceed. \n\n%s does not exist.\n" % meta["outdir"])
 
-    if meta['sourcetype'].lower() != 'folder' and meta['sourcetype'].lower() != 'image':
+    if meta["reportqueries"] and not os.path.exists(meta["reportqueries"]):
+        options.error(
+            "Unable to proceed. \n\n%s does not exist.\n" % meta["reportqueries"]
+        )
+
+    if meta["sourcetype"].lower() != "folder" and meta["sourcetype"].lower() != "image":
         options.error(
             'Unable to proceed. \n\nIncorrect source type provided: "%s". The following are valid options:\
-            \n -t folder\n -t image\n' % (meta['sourcetype']))
+            \n -t folder\n -t image\n'
+            % (meta["sourcetype"])
+        )
 
-    if meta['sourcetype'] == 'image' and DFVFS_IMPORT is False:
+    if meta["sourcetype"] == "image" and DFVFS_IMPORT is False:
         options.error(IMPORT_ERROR)
 
-    if meta['reportqueries'] ==False:
-        print('[Info]: Report queries file not specified using the -q option. Custom reports will not be generated.')
-        
-    if meta['casename'] is False:
+    if meta["reportqueries"] == False:
+        print(
+            "[Info]: Report queries file not specified using the -q option. Custom reports will not be generated."
+        )
+
+    if meta["casename"] is False:
         print('[Info]: No casename specified using -c. Defaulting to "FSE_Reports".')
-        meta['casename'] = 'FSE_Reports'
+        meta["casename"] = "FSE_Reports"
 
     # Return meta to caller #
     return meta
@@ -213,18 +238,20 @@ def enumerate_flags(flag, f_map):
     Iterate through record flag mappings and enumerate.
     """
     # Reset string based flags to null
-    f_type = ''
-    f_flag = ''
+    f_type = ""
+    f_flag = ""
     # Iterate through flags
     for i in f_map:
         if i & flag:
-            if f_map[i] == 'FolderEvent;' or \
-                    f_map[i] == 'FileEvent;' or \
-                    f_map[i] == 'SymbolicLink;' or \
-                    f_map[i] == 'HardLink;':
-                f_type = ''.join([f_type, f_map[i]])
+            if (
+                f_map[i] == "FolderEvent;"
+                or f_map[i] == "FileEvent;"
+                or f_map[i] == "SymbolicLink;"
+                or f_map[i] == "HardLink;"
+            ):
+                f_type = "".join([f_type, f_map[i]])
             else:
-                f_flag = ''.join([f_flag, f_map[i]])
+                f_flag = "".join([f_flag, f_map[i]])
     return f_type, f_flag
 
 
@@ -236,46 +263,53 @@ def progress(count, total):
     filled_len = int(round(bar_len * count / float(total)))
 
     percents = round(100 * count / float(total), 1)
-    p_bar = '=' * filled_len + '.' * (bar_len - filled_len)
+    p_bar = "=" * filled_len + "." * (bar_len - filled_len)
     try:
-        sys.stdout.write('  File {} of {}  [{}] {}{}\r'.format(count, total, p_bar, percents, '%'))
+        sys.stdout.write(
+            "  File {} of {}  [{}] {}{}\r".format(count, total, p_bar, percents, "%")
+        )
     except:
         pass
     sys.stdout.flush()
 
 
-class FSEventHandler():
+class FSEventHandler:
     """
     FSEventHandler iterates through and parses fsevents.
     """
 
     def __init__(self):
-        """
-        """
+        """ """
         self.meta = parse_options()
-        if self.meta['reportqueries']:
+        if self.meta["reportqueries"]:
             # Check json file
             try:
                 # Basic json syntax
-                self.r_queries = json.load(open(self.meta['reportqueries']))
+                self.r_queries = json.load(open(self.meta["reportqueries"]))
                 # Check to see if required keys are present
-                for i in self.r_queries['process_list']:
-                    i['report_name']
-                    i['query']
+                for i in self.r_queries["process_list"]:
+                    i["report_name"]
+                    i["query"]
             except Exception as exp:
-                print(('An error occurred while reading the json file. \n{}'.format(str(exp))))
+                print(
+                    (
+                        "An error occurred while reading the json file. \n{}".format(
+                            str(exp)
+                        )
+                    )
+                )
                 sys.exit(0)
         else:
             # if report queries option was not specified
             self.r_queries = False
 
-        self.path = self.meta['source']
+        self.path = self.meta["source"]
 
         create_sqlite_db(self)
 
         self.files = []
         self.pages = []
-        self.src_fullpath = ''
+        self.src_fullpath = ""
         self.dls_version = 0
 
         # Initialize statistic counters
@@ -288,81 +322,155 @@ class FSEventHandler():
         try:
             # Try to open ouput files
             self.l_all_fsevents = open(
-                os.path.join(self.meta['outdir'], self.meta['casename'], 'All_FSEVENTS.tsv'),
-                'wb'
+                os.path.join(
+                    self.meta["outdir"], self.meta["casename"], "All_FSEVENTS.tsv"
+                ),
+                "wb",
             )
             # Process report queries output files
             # if option was specified.
             if self.r_queries:
                 # Try to open custom report query output files
-                for i in self.r_queries['process_list']:
-                    r_file = os.path.join(self.meta['outdir'], self.meta['casename'], i['report_name'] + '.tsv')
+                for i in self.r_queries["process_list"]:
+                    r_file = os.path.join(
+                        self.meta["outdir"],
+                        self.meta["casename"],
+                        i["report_name"] + ".tsv",
+                    )
                     if os.path.exists(r_file):
                         os.remove(r_file)
-                    setattr(self, 'l_' + i['report_name'], open(r_file, 'wb'))
+                    setattr(self, "l_" + i["report_name"], open(r_file, "wb"))
 
             # Output log file for exceptions
-            l_file = os.path.join(self.meta['outdir'], self.meta['casename'], 'EXCEPTIONS_LOG.txt')
-            self.logfile = open(l_file, 'w')
+            l_file = os.path.join(
+                self.meta["outdir"], self.meta["casename"], "EXCEPTIONS_LOG.txt"
+            )
+            self.logfile = open(l_file, "w")
         except Exception as exp:
             # Print error to command prompt if unable to open files
-            if 'Permission denied' in str(exp):
-                print(('{}\nEnsure that you have permissions to write to file '
-                      '\nand output file is not in use by another application.\n'.format(str(exp))))
+            if "Permission denied" in str(exp):
+                print(
+                    (
+                        "{}\nEnsure that you have permissions to write to file "
+                        "\nand output file is not in use by another application.\n".format(
+                            str(exp)
+                        )
+                    )
+                )
             else:
                 print(exp)
             sys.exit(0)
 
         # Begin FSEvent processing
 
-        print(('\n[STARTED] {} UTC Parsing files.'.format(strftime("%m/%d/%Y %H:%M:%S", gmtime()))))
+        print(
+            (
+                "\n[STARTED] {} UTC Parsing files.".format(
+                    strftime("%m/%d/%Y %H:%M:%S", gmtime())
+                )
+            )
+        )
 
-        if self.meta['sourcetype'] == 'image':
+        if self.meta["sourcetype"] == "image":
             self._get_fsevent_image_files()
-        elif self.meta['sourcetype'] == 'folder':
+        elif self.meta["sourcetype"] == "folder":
             self._get_fsevent_files()
-            print(('\n  All Files Attempted: {}\n  All Parsed Files: {}\n  Files '
-                  'with Errors: {}\n  All Records Parsed: {}'.format(
-                self.all_files_count,
-                self.parsed_file_count,
-                self.error_file_count,
-                self.all_records_count)))
+            print(
+                (
+                    "\n  All Files Attempted: {}\n  All Parsed Files: {}\n  Files "
+                    "with Errors: {}\n  All Records Parsed: {}".format(
+                        self.all_files_count,
+                        self.parsed_file_count,
+                        self.error_file_count,
+                        self.all_records_count,
+                    )
+                )
+            )
 
-        print(('[FINISHED] {} UTC Parsing files.\n'.format(strftime("%m/%d/%Y %H:%M:%S", gmtime()))))
+        print(
+            (
+                "[FINISHED] {} UTC Parsing files.\n".format(
+                    strftime("%m/%d/%Y %H:%M:%S", gmtime())
+                )
+            )
+        )
 
-        print(('[STARTED] {} UTC Sorting fsevents table in Database.'.format(strftime("%m/%d/%Y %H:%M:%S", gmtime()))))
+        print(
+            (
+                "[STARTED] {} UTC Sorting fsevents table in Database.".format(
+                    strftime("%m/%d/%Y %H:%M:%S", gmtime())
+                )
+            )
+        )
 
         row_count = reorder_sqlite_db(self)
         if row_count != 0:
-            print(('[FINISHED] {} UTC Sorting fsevents table in Database.\n'.format(strftime("%m/%d/%Y %H:%M:%S", gmtime()))))
-    
-            print(('[STARTED] {} UTC Exporting fsevents table from Database.'.format(
-                strftime("%m/%d/%Y %H:%M:%S", gmtime()))))
-    
+            print(
+                (
+                    "[FINISHED] {} UTC Sorting fsevents table in Database.\n".format(
+                        strftime("%m/%d/%Y %H:%M:%S", gmtime())
+                    )
+                )
+            )
+
+            print(
+                (
+                    "[STARTED] {} UTC Exporting fsevents table from Database.".format(
+                        strftime("%m/%d/%Y %H:%M:%S", gmtime())
+                    )
+                )
+            )
+
             self.export_fsevent_report(self.l_all_fsevents, row_count)
-    
-            print(('[FINISHED] {} UTC Exporting fsevents table from Database.\n'.format(
-                strftime("%m/%d/%Y %H:%M:%S", gmtime()))))
-    
+
+            print(
+                (
+                    "[FINISHED] {} UTC Exporting fsevents table from Database.\n".format(
+                        strftime("%m/%d/%Y %H:%M:%S", gmtime())
+                    )
+                )
+            )
+
             if self.r_queries:
-                print(('[STARTED] {} UTC Exporting views from database '
-                      'to TSV files.'.format(strftime("%m/%d/%Y %H:%M:%S", gmtime()))))
-                for i in self.r_queries['process_list']:
-                    Output.print_columns(getattr(self, 'l_' + i['report_name']))
+                print(
+                    (
+                        "[STARTED] {} UTC Exporting views from database "
+                        "to TSV files.".format(strftime("%m/%d/%Y %H:%M:%S", gmtime()))
+                    )
+                )
+                for i in self.r_queries["process_list"]:
+                    Output.print_columns(getattr(self, "l_" + i["report_name"]))
                 # Export report views to output files
                 self.export_sqlite_views()
-                print(('[FINISHED] {} UTC Exporting views from database '
-                      'to TSV files.\n'.format(strftime("%m/%d/%Y %H:%M:%S", gmtime()))))
-    
-            print(("  Exception log and Reports exported to:\n  '{}'\n".format(os.path.join(self.meta['outdir'], self.meta['casename']))))
-    
+                print(
+                    (
+                        "[FINISHED] {} UTC Exporting views from database "
+                        "to TSV files.\n".format(
+                            strftime("%m/%d/%Y %H:%M:%S", gmtime())
+                        )
+                    )
+                )
+
+            print(
+                (
+                    "  Exception log and Reports exported to:\n  '{}'\n".format(
+                        os.path.join(self.meta["outdir"], self.meta["casename"])
+                    )
+                )
+            )
+
             # Close output files
             self.l_all_fsevents.close()
             self.logfile.close()
         else:
-            print(('[FINISHED] {} UTC No records were parsed.\n'.format(strftime("%m/%d/%Y %H:%M:%S", gmtime()))))
-            print('Nothing to export.\n')
-
+            print(
+                (
+                    "[FINISHED] {} UTC No records were parsed.\n".format(
+                        strftime("%m/%d/%Y %H:%M:%S", gmtime())
+                    )
+                )
+            )
+            print("Nothing to export.\n")
 
     @contextlib.contextmanager
     def skip_gzip_check(self):
@@ -376,7 +484,6 @@ class FSEventHandler():
         gzip.GzipFile._read_eof = lambda *args, **kwargs: None
         yield
         gzip.GzipFile._read_eof = _read_eof
-
 
     def _get_fsevent_files(self):
         """
@@ -392,7 +499,7 @@ class FSEventHandler():
         # Total number of files in events dir #
         t_files = len(os.listdir(self.path))
         for filename in os.listdir(self.path):
-            if filename == 'fseventsd-uuid':
+            if filename == "fseventsd-uuid":
                 t_files -= 1
         self.time_range_src_mod = []
         prev_mod_date = "Unknown"
@@ -411,7 +518,9 @@ class FSEventHandler():
         # exists for the first file and the last file
         # in the provided source fsevents folder
         first = os.path.join(self.path, os.listdir(self.path)[0])
-        last = os.path.join(self.path, os.listdir(self.path)[len(os.listdir(self.path)) - 1])
+        last = os.path.join(
+            self.path, os.listdir(self.path)[len(os.listdir(self.path)) - 1]
+        )
         first = os.path.getmtime(first)
         last = os.path.getmtime(last)
         first = str(datetime.datetime.utcfromtimestamp(first))[:14]
@@ -422,7 +531,7 @@ class FSEventHandler():
 
         # Iterate through each file in supplied fsevents dir
         for filename in os.listdir(self.path):
-            if filename == 'fseventsd-uuid':
+            if filename == "fseventsd-uuid":
                 continue
             # Variables
             self.all_files_count += 1
@@ -438,16 +547,23 @@ class FSEventHandler():
             self.src_filename = filename
             # UTC mod date of source fsevent file
             self.m_time = os.path.getmtime(self.src_fullpath)
-            self.m_time = str(datetime.datetime.utcfromtimestamp((self.m_time))) + " [UTC]"
+            self.m_time = (
+                str(datetime.datetime.utcfromtimestamp((self.m_time))) + " [UTC]"
+            )
 
             # Regex to match against source fsevent log filename
-            regexp = re.compile(r'^.*[\][0-9a-fA-F]{16}$')
+            regexp = re.compile(r"^.*[\][0-9a-fA-F]{16}$")
 
             # Test to see if fsevent file name matches naming standard
             # if not, assume this is a carved gzip
             if len(self.src_filename) == 16 and regexp.search(filename) is not None:
                 c_last_wd = int(self.src_filename, 16)
-                self.time_range_src_mod = prev_last_wd, c_last_wd, prev_mod_date, self.m_time
+                self.time_range_src_mod = (
+                    prev_last_wd,
+                    c_last_wd,
+                    prev_mod_date,
+                    self.m_time,
+                )
                 self.is_carved_gzip = False
             else:
                 self.is_carved_gzip = True
@@ -460,17 +576,21 @@ class FSEventHandler():
 
             except Exception as exp:
                 # When permission denied is encountered
-                if "Permission denied" in str(exp) and not os.path.isdir(self.src_fullpath):
-                    print(('\nEnsure that you have permissions to read '
-                          'from {}\n{}\n'.format(self.path, str(exp))))
+                if "Permission denied" in str(exp) and not os.path.isdir(
+                    self.src_fullpath
+                ):
+                    print(
+                        (
+                            "\nEnsure that you have permissions to read "
+                            "from {}\n{}\n".format(self.path, str(exp))
+                        )
+                    )
                     sys.exit(0)
                 # Otherwise write error to log file
                 else:
                     self.logfile.write(
-                        "%s\tError: Error while decompressing FSEvents file.%s\n" % (
-                            self.src_filename,
-                            str(exp)
-                        )
+                        "%s\tError: Error while decompressing FSEvents file.%s\n"
+                        % (self.src_filename, str(exp))
                     )
                 self.error_file_count += 1
                 continue
@@ -480,8 +600,10 @@ class FSEventHandler():
 
             # If check for DLS returns false, write information to logfile
             if dls_chk is False:
-                self.logfile.write('%s\tInfo: DLS Header Check Failed. Unable to find a '
-                                   'DLS header. Unable to parse File.\n' % (self.src_filename))
+                self.logfile.write(
+                    "%s\tInfo: DLS Header Check Failed. Unable to find a "
+                    "DLS header. Unable to parse File.\n" % (self.src_filename)
+                )
                 # Continue to the next file in the fsevents directory
                 self.error_file_count += 1
                 continue
@@ -498,7 +620,6 @@ class FSEventHandler():
             # If DLSs were found, pass the decompressed file to be parsed
             FSEventHandler.parse(self, buf)
 
-
     def _get_fsevent_image_files(self):
         """
         get_fsevent_files will iterate through each file in the fsevents dir
@@ -509,48 +630,45 @@ class FSEventHandler():
         """
         # Print the header columns to the output file
         Output.print_columns(self.l_all_fsevents)
-                
+
         scan_path_spec = None
         scanner = source_scanner.SourceScanner()
         scan_context = source_scanner.SourceScannerContext()
-        scan_context.OpenSourcePath(self.meta['source'])
+        scan_context.OpenSourcePath(self.meta["source"])
 
-        scanner.Scan(
-            scan_context,
-            scan_path_spec=scan_path_spec
-        )
+        scanner.Scan(scan_context, scan_path_spec=scan_path_spec)
 
-        for file_system_path_spec, file_system_scan_node in list(scan_context._file_system_scan_nodes.items()):
+        for file_system_path_spec, file_system_scan_node in list(
+            scan_context._file_system_scan_nodes.items()
+        ):
             t_files = 0
             self.all_files_count = 0
             self.error_file_count = 0
             self.all_records_count = 0
             self.parsed_file_count = 0
-            
+
             try:
                 location = file_system_path_spec.parent.location
             except:
                 location = file_system_path_spec.location
-                
+
             print("  Processing Volume {}.\n".format(location))
-            fsevent_locs = ["/.fseventsd","/System/Volumes/Data/.fseventsd"]
+            fsevent_locs = ["/.fseventsd", "/System/Volumes/Data/.fseventsd"]
 
             for f_loc in fsevent_locs:
                 fs_event_path_spec = path_spec_factory.Factory.NewPathSpec(
                     file_system_path_spec.type_indicator,
                     parent=file_system_path_spec.parent,
-                    location=f_loc
+                    location=f_loc,
                 )
 
-                file_entry = resolver.Resolver.OpenFileEntry(
-                    fs_event_path_spec
-                )
-                
+                file_entry = resolver.Resolver.OpenFileEntry(fs_event_path_spec)
+
                 if file_entry != None:
 
                     t_files = file_entry.number_of_sub_file_entries
                     for sub_file_entry in file_entry.sub_file_entries:
-                        if sub_file_entry.name == 'fseventsd-uuid':
+                        if sub_file_entry.name == "fseventsd-uuid":
                             t_files -= 1
 
                     self.time_range_src_mod = []
@@ -565,7 +683,7 @@ class FSEventHandler():
 
                     # Iterate through each file in supplied fsevents dir
                     for sub_file_entry in file_entry.sub_file_entries:
-                        if sub_file_entry.name == 'fseventsd-uuid':
+                        if sub_file_entry.name == "fseventsd-uuid":
                             continue
                         # Variables
                         counter += 1
@@ -578,23 +696,39 @@ class FSEventHandler():
 
                         # Name of source fsevent file
                         self.src_filename = sub_file_entry.name
-                        self.src_fullpath = self.meta['source'] + ": " + location + sub_file_entry.path_spec.location
+                        self.src_fullpath = (
+                            self.meta["source"]
+                            + ": "
+                            + location
+                            + sub_file_entry.path_spec.location
+                        )
 
                         stat_object = sub_file_entry.GetStat()
 
                         # UTC mod date of source fsevent file
-                        self.m_time = datetime.datetime.fromtimestamp(
-                            stat_object.mtime).strftime(
-                            '%Y-%m-%d %H:%M:%S') + " [UTC]"
+                        self.m_time = (
+                            datetime.datetime.fromtimestamp(stat_object.mtime).strftime(
+                                "%Y-%m-%d %H:%M:%S"
+                            )
+                            + " [UTC]"
+                        )
 
                         # Regex to match against source fsevent log filename
-                        regexp = re.compile(r'^.*[\][0-9a-fA-F]{16}$')
+                        regexp = re.compile(r"^.*[\][0-9a-fA-F]{16}$")
 
                         # Test to see if fsevent file name matches naming standard
                         # if not, assume this is a carved gzip
-                        if len(self.src_filename) == 16 and regexp.search(self.src_filename) is not None:
+                        if (
+                            len(self.src_filename) == 16
+                            and regexp.search(self.src_filename) is not None
+                        ):
                             c_last_wd = int(self.src_filename, 16)
-                            self.time_range_src_mod = prev_last_wd, c_last_wd, prev_mod_date, self.m_time
+                            self.time_range_src_mod = (
+                                prev_last_wd,
+                                c_last_wd,
+                                prev_mod_date,
+                                self.m_time,
+                            )
                             self.is_carved_gzip = False
                         else:
                             self.is_carved_gzip = True
@@ -606,26 +740,31 @@ class FSEventHandler():
                         # Attempt to decompress the fsevent archive
                         try:
                             with self.skip_gzip_check():
-                                self.files = gzip.GzipFile(fileobj=compressedFile, mode='rb')
+                                self.files = gzip.GzipFile(
+                                    fileobj=compressedFile, mode="rb"
+                                )
                                 buf = self.files.read()
 
                         except Exception as exp:
                             self.logfile.write(
-                                "%s\tError: Error while decompressing FSEvents file.%s\n" % (
-                                    self.src_filename,
-                                    str(exp)
-                                )
+                                "%s\tError: Error while decompressing FSEvents file.%s\n"
+                                % (self.src_filename, str(exp))
                             )
                             self.error_file_count += 1
                             continue
 
                         # If decompress is success, check for DLS headers in the current file
-                        dls_chk = FSEventHandler.dls_header_search(self, buf, self.src_filename)
+                        dls_chk = FSEventHandler.dls_header_search(
+                            self, buf, self.src_filename
+                        )
 
                         # If check for DLS returns false, write information to logfile
                         if dls_chk is False:
-                            self.logfile.write('%s\tInfo: DLS Header Check Failed. Unable to find a '
-                                               'DLS header. Unable to parse File.\n' % (self.src_filename))
+                            self.logfile.write(
+                                "%s\tInfo: DLS Header Check Failed. Unable to find a "
+                                "DLS header. Unable to parse File.\n"
+                                % (self.src_filename)
+                            )
                             # Continue to the next file in the fsevents directory
                             self.error_file_count += 1
                             continue
@@ -641,18 +780,22 @@ class FSEventHandler():
 
                         # If DLSs were found, pass the decompressed file to be parsed
                         FSEventHandler.parse(self, buf)
-                
+
                 else:
-                    print('Unable to process volume or no fsevent files found')
+                    print("Unable to process volume or no fsevent files found")
                     continue
 
-            print(('\n\n  All Files Attempted: {}\n  All Parsed Files: {}\n  Files '
-                  'with Errors: {}\n  All Records Parsed: {}'.format(
-                self.all_files_count,
-                self.parsed_file_count,
-                self.error_file_count,
-                self.all_records_count)))
-
+            print(
+                (
+                    "\n\n  All Files Attempted: {}\n  All Parsed Files: {}\n  Files "
+                    "with Errors: {}\n  All Records Parsed: {}".format(
+                        self.all_files_count,
+                        self.parsed_file_count,
+                        self.error_file_count,
+                        self.all_records_count,
+                    )
+                )
+            )
 
     def dls_header_search(self, buf, f_name):
         """
@@ -673,18 +816,27 @@ class FSEventHandler():
         while end_offset != self.file_size:
             try:
                 start_offset = end_offset
-                page_len = struct.unpack("<I", raw_file[start_offset + 8:start_offset + 12])[0]
+                page_len = struct.unpack(
+                    "<I", raw_file[start_offset + 8 : start_offset + 12]
+                )[0]
                 end_offset = start_offset + page_len
-                rfh = str(raw_file[start_offset:start_offset + 4])[2:-1]
+                rfh = str(raw_file[start_offset : start_offset + 4])[2:-1]
 
-                if rfh == '1SLD' or rfh == '2SLD' or rfh == '3SLD':
-                    self.my_dls.append({'Start Offset': start_offset, 'End Offset': end_offset})
+                if rfh == "1SLD" or rfh == "2SLD" or rfh == "3SLD":
+                    self.my_dls.append(
+                        {"Start Offset": start_offset, "End Offset": end_offset}
+                    )
                     dls_count += 1
                 else:
-                    self.logfile.write("%s: Error in length of page when finding page headers." % (f_name))
+                    self.logfile.write(
+                        "%s: Error in length of page when finding page headers."
+                        % (f_name)
+                    )
                     break
             except:
-                self.logfile.write("%s: Error in length of page when finding page headers." % (f_name))
+                self.logfile.write(
+                    "%s: Error in length of page when finding page headers." % (f_name)
+                )
                 sys.exit(0)
 
         if dls_count == 0:
@@ -693,7 +845,6 @@ class FSEventHandler():
         else:
             # Return true so that the DLSs found can be parsed
             return True
-
 
     def parse(self, buf):
         """
@@ -712,8 +863,8 @@ class FSEventHandler():
         # Iterate through DLS pages found in current fsevent file
         for i in self.my_dls:
             # Assign current DLS offsets
-            start_offset = self.my_dls[pg_count]['Start Offset']
-            end_offset = self.my_dls[pg_count]['End Offset']
+            start_offset = self.my_dls[pg_count]["Start Offset"]
+            end_offset = self.my_dls[pg_count]["End Offset"]
 
             # Extract the raw DLS page from the fsevents file
             raw_page = buf[start_offset:end_offset]
@@ -734,14 +885,9 @@ class FSEventHandler():
                 break
 
             # Pass the raw page + a start offset to find records within page
-            FSEventHandler.find_page_records(
-                self,
-                raw_page,
-                start_offset
-            )
+            FSEventHandler.find_page_records(self, raw_page, start_offset)
             # Increment the DLS page count by 1
             pg_count += 1
-
 
     def find_date(self, raw_file):
         """
@@ -762,39 +908,71 @@ class FSEventHandler():
             self.time_range.append([self.time_range_src_mod[1], c_time_2])
 
         # Regex's for logs with dates in name
-        regex_1 = ("private/var/log/asl/[\x30-\x39]{4}[.][\x30-\x39]{2}" +
-                   "[.][\x30-\x39]{2}[.][\x30-\x7a]{2,8}[.]asl")
-        regex_2 = ("mobile/Library/Logs/CrashReporter/DiagnosticLogs/security[.]log" +
-                   "[.][\x30-\x39]{8}T[\x30-\x39]{6}Z")
-        regex_3 = ("private/var/log/asl/Logs/aslmanager[.][\x30-\x39]{8}T[\x30-\x39]" +
-                   "{6}[-][\x30-\x39]{2}")
-        regex_4 = ("private/var/log/DiagnosticMessages/[\x30-\x39]{4}[.][\x30-\x39]{2}" +
-                   "[.][\x30-\x39]{2}[.]asl")
-        regex_5 = ("private/var/log/com[.]apple[.]clouddocs[.]asl/[\x30-\x39]{4}[.]" +
-                   "[\x30-\x39]{2}[.][\x30-\x39]{2}[.]asl")
-        regex_6 = ("private/var/log/powermanagement/[\x30-\x39]{4}[.][\x30-\x39]{2}[.]" +
-                   "[\x30-\x39]{2}[.]asl")
-        regex_7 = ("private/var/log/asl/AUX[.][\x30-\x39]{4}[.][\x30-\x39]{2}[.]" +
-                   "[\x30-\x39]{2}/[0-9]{9}")
+        regex_1 = (
+            "private/var/log/asl/[\x30-\x39]{4}[.][\x30-\x39]{2}"
+            + "[.][\x30-\x39]{2}[.][\x30-\x7a]{2,8}[.]asl"
+        )
+        regex_2 = (
+            "mobile/Library/Logs/CrashReporter/DiagnosticLogs/security[.]log"
+            + "[.][\x30-\x39]{8}T[\x30-\x39]{6}Z"
+        )
+        regex_3 = (
+            "private/var/log/asl/Logs/aslmanager[.][\x30-\x39]{8}T[\x30-\x39]"
+            + "{6}[-][\x30-\x39]{2}"
+        )
+        regex_4 = (
+            "private/var/log/DiagnosticMessages/[\x30-\x39]{4}[.][\x30-\x39]{2}"
+            + "[.][\x30-\x39]{2}[.]asl"
+        )
+        regex_5 = (
+            "private/var/log/com[.]apple[.]clouddocs[.]asl/[\x30-\x39]{4}[.]"
+            + "[\x30-\x39]{2}[.][\x30-\x39]{2}[.]asl"
+        )
+        regex_6 = (
+            "private/var/log/powermanagement/[\x30-\x39]{4}[.][\x30-\x39]{2}[.]"
+            + "[\x30-\x39]{2}[.]asl"
+        )
+        regex_7 = (
+            "private/var/log/asl/AUX[.][\x30-\x39]{4}[.][\x30-\x39]{2}[.]"
+            + "[\x30-\x39]{2}/[0-9]{9}"
+        )
         regex_8 = "private/var/audit/[\x30-\x39]{14}[.]not_terminated"
 
         # Regex that matches only events with created flag
-        flag_regex = ("[\x00-\xFF]{9}[\x01|\x11|\x21|\x31|\x41|\x51|\x61|\x05|\x15|" +
-                      "\x25|\x35|\x45|\x55|\x65]")
+        flag_regex = (
+            "[\x00-\xFF]{9}[\x01|\x11|\x21|\x31|\x41|\x51|\x61|\x05|\x15|"
+            + "\x25|\x35|\x45|\x55|\x65]"
+        )
 
         # Concatenating date, flag matching regexes
         # Also grabs working descriptor for record
-        m_regex = "(" + regex_1 + "|" + regex_2 + "|" + regex_3 + "|" + regex_4 + "|" + regex_5
-        m_regex = m_regex + "|" + regex_6 + "|" + regex_7 + "|" + regex_8 + ")" + flag_regex
+        m_regex = (
+            "("
+            + regex_1
+            + "|"
+            + regex_2
+            + "|"
+            + regex_3
+            + "|"
+            + regex_4
+            + "|"
+            + regex_5
+        )
+        m_regex = (
+            m_regex + "|" + regex_6 + "|" + regex_7 + "|" + regex_8 + ")" + flag_regex
+        )
         m_regex = m_regex.encode("utf-8")
 
         # Start searching within fsevent file for events that match dates regex
         # As the length of each log location is different, create if statements for each
         # so that the date can be pulled from the correct location within the fullpath
         for match in re.finditer(m_regex, raw_file):
-            if raw_file[match.regs[0][0]:match.regs[0][0] + 35] == "private/var/log/asl/Logs/aslmanager":
+            if (
+                raw_file[match.regs[0][0] : match.regs[0][0] + 35]
+                == "private/var/log/asl/Logs/aslmanager"
+            ):
                 # Clear timestamp temp variable
-                t_temp = ''
+                t_temp = ""
                 # t_start uses the start offset of the match
                 t_start = match.regs[0][0] + 36
                 # The date is 8 chars long in the format of yyyymmdd
@@ -803,30 +981,42 @@ class FSEventHandler():
                 t_temp = raw_file[t_start:t_end]
                 # Format the date
                 t_temp = t_temp[:4] + "." + t_temp[4:6] + "." + t_temp[6:8]
-                wd_temp = struct.unpack("<Q", raw_file[match.regs[0][1] - 9:match.regs[0][1] - 1])[0]
-            elif raw_file[match.regs[0][0]:match.regs[0][0] + 23] == "private/var/log/asl/AUX":
+                wd_temp = struct.unpack(
+                    "<Q", raw_file[match.regs[0][1] - 9 : match.regs[0][1] - 1]
+                )[0]
+            elif (
+                raw_file[match.regs[0][0] : match.regs[0][0] + 23]
+                == "private/var/log/asl/AUX"
+            ):
                 # Clear timestamp temp variable
-                t_temp = ''
+                t_temp = ""
                 # t_start uses the start offset of the match
                 t_start = match.regs[0][0] + 24
                 # The date is 10 chars long in the format of yyyy.mm.dd
                 t_end = t_start + 10
                 # Strip the date from the fsevent file
                 t_temp = raw_file[t_start:t_end]
-                wd_temp = struct.unpack("<Q", raw_file[match.regs[0][1] - 9:match.regs[0][1] - 1])[0]
-            elif raw_file[match.regs[0][0]:match.regs[0][0] + 19] == "private/var/log/asl":
+                wd_temp = struct.unpack(
+                    "<Q", raw_file[match.regs[0][1] - 9 : match.regs[0][1] - 1]
+                )[0]
+            elif (
+                raw_file[match.regs[0][0] : match.regs[0][0] + 19]
+                == "private/var/log/asl"
+            ):
                 # Clear timestamp temp variable
-                t_temp = ''
+                t_temp = ""
                 # t_start uses the start offset of the match
                 t_start = match.regs[0][0] + 20
                 # The date is 10 chars long in the format of yyyy.mm.dd
                 t_end = t_start + 10
                 # Strip the date from the fsevent file
                 t_temp = raw_file[t_start:t_end]
-                wd_temp = struct.unpack("<Q", raw_file[match.regs[0][1] - 9:match.regs[0][1] - 1])[0]
-            elif raw_file[match.regs[0][0]:match.regs[0][0] + 4] == "mobi":
+                wd_temp = struct.unpack(
+                    "<Q", raw_file[match.regs[0][1] - 9 : match.regs[0][1] - 1]
+                )[0]
+            elif raw_file[match.regs[0][0] : match.regs[0][0] + 4] == "mobi":
                 # Clear timestamp temp variable
-                t_temp = ''
+                t_temp = ""
                 # t_start uses the start offset of the match
                 t_start = match.regs[0][0] + 62
                 # The date is 8 chars long in the format of yyyymmdd
@@ -835,40 +1025,60 @@ class FSEventHandler():
                 t_temp = raw_file[t_start:t_end]
                 # Format the date
                 t_temp = t_temp[:4] + "." + t_temp[4:6] + "." + t_temp[6:8]
-                wd_temp = struct.unpack("<Q", raw_file[match.regs[0][1] - 9:match.regs[0][1] - 1])[0]
-            elif raw_file[match.regs[0][0]:match.regs[0][0] + 34] == "private/var/log/DiagnosticMessages":
+                wd_temp = struct.unpack(
+                    "<Q", raw_file[match.regs[0][1] - 9 : match.regs[0][1] - 1]
+                )[0]
+            elif (
+                raw_file[match.regs[0][0] : match.regs[0][0] + 34]
+                == "private/var/log/DiagnosticMessages"
+            ):
                 # Clear timestamp temp variable
-                t_temp = ''
+                t_temp = ""
                 # t_start uses the start offset of the match
                 t_start = match.regs[0][0] + 35
                 # The date is 10 chars long in the format of yyyy.mm.dd
                 t_end = t_start + 10
                 # Strip the date from the fsevent file
                 t_temp = raw_file[t_start:t_end]
-                wd_temp = struct.unpack("<Q", raw_file[match.regs[0][1] - 9:match.regs[0][1] - 1])[0]
-            elif raw_file[match.regs[0][0]:match.regs[0][0] + 39] == "private/var/log/com.apple.clouddocs.asl":
+                wd_temp = struct.unpack(
+                    "<Q", raw_file[match.regs[0][1] - 9 : match.regs[0][1] - 1]
+                )[0]
+            elif (
+                raw_file[match.regs[0][0] : match.regs[0][0] + 39]
+                == "private/var/log/com.apple.clouddocs.asl"
+            ):
                 # Clear timestamp temp variable
-                t_temp = ''
+                t_temp = ""
                 # t_start uses the start offset of the match
                 t_start = match.regs[0][0] + 40
                 # The date is 10 chars long in the format of yyyy.mm.dd
                 t_end = t_start + 10
                 # Strip the date from the fsevent file
                 t_temp = raw_file[t_start:t_end]
-                wd_temp = struct.unpack("<Q", raw_file[match.regs[0][1] - 9:match.regs[0][1] - 1])[0]
-            elif raw_file[match.regs[0][0]:match.regs[0][0] + 31] == "private/var/log/powermanagement":
+                wd_temp = struct.unpack(
+                    "<Q", raw_file[match.regs[0][1] - 9 : match.regs[0][1] - 1]
+                )[0]
+            elif (
+                raw_file[match.regs[0][0] : match.regs[0][0] + 31]
+                == "private/var/log/powermanagement"
+            ):
                 # Clear timestamp temp variable
-                t_temp = ''
+                t_temp = ""
                 # t_start uses the start offset of the match
                 t_start = match.regs[0][0] + 32
                 # The date is 10 chars long in the format of yyyy.mm.dd
                 t_end = t_start + 10
                 # Strip the date from the fsevent file
                 t_temp = raw_file[t_start:t_end]
-                wd_temp = struct.unpack("<Q", raw_file[match.regs[0][1] - 9:match.regs[0][1] - 1])[0]
-            elif raw_file[match.regs[0][0]:match.regs[0][0] + 17] == "private/var/audit":
+                wd_temp = struct.unpack(
+                    "<Q", raw_file[match.regs[0][1] - 9 : match.regs[0][1] - 1]
+                )[0]
+            elif (
+                raw_file[match.regs[0][0] : match.regs[0][0] + 17]
+                == "private/var/audit"
+            ):
                 # Clear timestamp temp variable
-                t_temp = ''
+                t_temp = ""
                 # t_start uses the start offset of the match
                 t_start = match.regs[0][0] + 18
                 # The date is 8 chars long in the format of yyyymmdd
@@ -877,12 +1087,14 @@ class FSEventHandler():
                 t_temp = raw_file[t_start:t_end]
                 # Format the date
                 t_temp = t_temp[:4] + "." + t_temp[4:6] + "." + t_temp[6:8]
-                wd_temp = struct.unpack("<Q", raw_file[match.regs[0][1] - 9:match.regs[0][1] - 1])[0]
+                wd_temp = struct.unpack(
+                    "<Q", raw_file[match.regs[0][1] - 9 : match.regs[0][1] - 1]
+                )[0]
             else:
-                t_temp = ''
-                wd_temp = ''
+                t_temp = ""
+                wd_temp = ""
             # Append date, wd to time range list
-            if wd_temp == '' and t_temp == '':
+            if wd_temp == "" and t_temp == "":
                 pass
             else:
                 self.time_range.append([wd_temp, t_temp])
@@ -892,13 +1104,11 @@ class FSEventHandler():
         # Call the time range builder to rebuild time range
         self.build_time_range()
 
-
     def get_key(self, item):
         """
         Return the key in the time range item provided.
         """
         return item[0]
-
 
     def build_time_range(self):
         """
@@ -906,7 +1116,7 @@ class FSEventHandler():
         include the previous and current working descriptor
         as well as the previous and current date found
         """
-        prev_date = '0'
+        prev_date = "0"
         prev_wd = 0
         temp = []
 
@@ -930,15 +1140,14 @@ class FSEventHandler():
                 prev_date = prev_date
             else:
                 # Reassign prev_date to 'Unknown'
-                if prev_date == '0':
-                    prev_date = 'Unknown'
+                if prev_date == "0":
+                    prev_date = "Unknown"
                 # Add previous, current wd and previous, current date to temp
                 temp.append([prev_wd, i[0], prev_date, i[1]])
                 prev_wd = i[0]
                 prev_date = i[1]
         # Assign temp list to time range list
         self.time_range = temp
-
 
     def find_page_records(self, page_buf, page_start_off):
         """
@@ -948,8 +1157,8 @@ class FSEventHandler():
         """
 
         # Initialize variables
-        fullpath = ''
-        char = ''
+        fullpath = ""
+        char = ""
 
         # Start, end offset of first record to be parsed within current DLS page
         start_offset = 12
@@ -959,16 +1168,11 @@ class FSEventHandler():
 
         # Call the file header parser for current DLS page
         try:
-            FsEventFileHeader(
-                page_buf[:13],
-                self.src_fullpath
-            )
+            FsEventFileHeader(page_buf[:13], self.src_fullpath)
         except:
             self.logfile.write(
-                "%s\tError: Unable to parse file header at offset %d\n" % (
-                    self.src_filename,
-                    page_start_off
-                )
+                "%s\tError: Unable to parse file header at offset %d\n"
+                % (self.src_filename, page_start_off)
             )
 
         # Account for length of record for different DLS versions
@@ -995,14 +1199,16 @@ class FSEventHandler():
             # Grab the first char
             char = page_buf[start_offset:end_offset].hex()
 
-            if char != '00':
+            if char != "00":
                 # Replace non-printable char with nothing
-                if str(char).lower() == '0d' or str(char).lower() == '0a':
-                    self.logfile.write('%s\tInfo: Non-printable char %s in record fullpath at '
-                                       'page offset %d. Parser removed char for reporting '
-                                       'purposes.\n' % \
-                                       (self.src_filename, char, page_start_off + start_offset))
-                    char = ''
+                if str(char).lower() == "0d" or str(char).lower() == "0a":
+                    self.logfile.write(
+                        "%s\tInfo: Non-printable char %s in record fullpath at "
+                        "page offset %d. Parser removed char for reporting "
+                        "purposes.\n"
+                        % (self.src_filename, char, page_start_off + start_offset)
+                    )
+                    char = ""
                 # Append the current char to the full path for current record
                 fullpath = fullpath + char
                 # Increment the offsets by one
@@ -1010,7 +1216,7 @@ class FSEventHandler():
                 end_offset += 1
                 # Continue the while loop
                 continue
-            elif char == '00':
+            elif char == "00":
                 # When 00 is found, then it is the end of fullpath
                 # Increment the offsets by bin_len, this will be the start of next full path
                 start_offset += bin_len
@@ -1019,8 +1225,8 @@ class FSEventHandler():
             # Decode fullpath that was stored as hex
 
             fullpath = bytes.fromhex(fullpath)
-            fullpath = fullpath.replace(b'\t', b'')
-            fullpath = str(fullpath,'utf-8')
+            fullpath = fullpath.replace(b"\t", b"")
+            fullpath = str(fullpath, "utf-8")
             # Store the record length
             record_len = len(fullpath) + bin_len
 
@@ -1057,7 +1263,7 @@ class FSEventHandler():
                 fs_node_id = struct.unpack("<q", raw_record[12:])[0]
             # Assign file system node id if DLS version is 3
             # Assign UID if DLS version is 3
-            # UID introduced with Sonoma          
+            # UID introduced with Sonoma
             if self.dls_version == 3:
                 fs_node_id = struct.unpack("<q", raw_record[12:20])[0]
                 fs_uid = struct.unpack("<i", raw_record[20:24])[0]
@@ -1072,11 +1278,13 @@ class FSEventHandler():
 
             # If record is not valid, stop parsing records in page
             if self.valid_record_check is False or record.wd == 0:
-                self.logfile.write('%s\tInfo: First invalid record found in carved '
-                                   'gzip at offset %d. The remainder of this buffer '
-                                   'will not be parsed.\n' % \
-                                   (self.src_filename, page_start_off + start_offset))
-                fullpath = ''
+                self.logfile.write(
+                    "%s\tInfo: First invalid record found in carved "
+                    "gzip at offset %d. The remainder of this buffer "
+                    "will not be parsed.\n"
+                    % (self.src_filename, page_start_off + start_offset)
+                )
+                fullpath = ""
                 break
             # Otherwise assign attributes and add to outpur reports
             else:
@@ -1084,20 +1292,20 @@ class FSEventHandler():
                 dates = self.apply_date(record.wd)
                 # Assign our current records attributes
                 attributes = {
-                    'id': record.wd,
-                    'id_hex': "0x{}".format(record.wd_hex),
-                    'fullpath': fullpath,
-                    'filename': f_name,
-                    'type': record.mask[0],
-                    'flags': record.mask[1],
-                    'approx_dates_plus_minus_one_day': dates,
-                    'mask': mask_hex,
-                    'node_id': fs_node_id,
-                    'fs_uid': fs_uid,
-                    'dls_version': self.dls_version,
-                    'record_end_offset': record_off,
-                    'source': self.src_fullpath,
-                    'source_modified_time': self.m_time
+                    "id": record.wd,
+                    "id_hex": "0x{}".format(record.wd_hex),
+                    "fullpath": fullpath,
+                    "filename": f_name,
+                    "type": record.mask[0],
+                    "flags": record.mask[1],
+                    "approx_dates_plus_minus_one_day": dates,
+                    "mask": mask_hex,
+                    "node_id": fs_node_id,
+                    "fs_uid": fs_uid,
+                    "dls_version": self.dls_version,
+                    "record_end_offset": record_off,
+                    "source": self.src_fullpath,
+                    "source_modified_time": self.m_time,
                 }
 
                 output = Output(attributes)
@@ -1105,10 +1313,9 @@ class FSEventHandler():
                 # Print the parsed record to output file
                 output.append_row()
 
-                fullpath = ''
+                fullpath = ""
             # Increment the current record count by 1
             self.all_records_count += 1
-
 
     def check_record(self, mask, fullpath):
         """
@@ -1122,8 +1329,11 @@ class FSEventHandler():
             # Flag conflicts
             # These flag combinations can not exist together
             type_err = "FolderEvent" in mask[0] and "FileEvent" in mask[0]
-            fol_cr_err = "FolderEvent" in mask[0] and "Created" in mask[1] and \
-                         "FolderCreated" not in mask[1]
+            fol_cr_err = (
+                "FolderEvent" in mask[0]
+                and "Created" in mask[1]
+                and "FolderCreated" not in mask[1]
+            )
             fil_cr_err = "FileEvent" in mask[0] and "FolderCreated" in mask[1]
             lnk_err = "SymbolicLink" in mask[0] and "HardLink" in mask[0]
             h_lnk_err = "HardLink" not in mask[0] and "LastHardLink" in mask[1]
@@ -1133,20 +1343,22 @@ class FSEventHandler():
 
             # Check for decode errors
             try:
-                fullpath.decode('utf-8')
+                fullpath.decode("utf-8")
             except:
                 decode_error = True
 
             # If any error exists return false to caller
-            if type_err or \
-                    fol_cr_err or \
-                    fil_cr_err or \
-                    lnk_err or \
-                    h_lnk_err or \
-                    h_lnk_err_2 or \
-                    n_used_err or \
-                    decode_error or \
-                    ver_error:
+            if (
+                type_err
+                or fol_cr_err
+                or fil_cr_err
+                or lnk_err
+                or h_lnk_err
+                or h_lnk_err_2
+                or n_used_err
+                or decode_error
+                or ver_error
+            ):
                 return False
             else:
                 # Record passed tests and may be valid
@@ -1155,7 +1367,6 @@ class FSEventHandler():
         else:
             # Return true. fsevent file was not identified as being carved
             return True
-
 
     def apply_date(self, wd):
         """
@@ -1168,7 +1379,11 @@ class FSEventHandler():
         c_mod_date = str(self.m_time)[:10].replace("-", ".")
 
         # No dates were found. Return source mod date
-        if len(self.time_range) == 0 and not self.is_carved_gzip and self.use_file_mod_dates:
+        if (
+            len(self.time_range) == 0
+            and not self.is_carved_gzip
+            and self.use_file_mod_dates
+        ):
             return c_mod_date
         # If dates were found
         elif len(self.time_range) != 0 and not self.is_carved_gzip:
@@ -1204,14 +1419,13 @@ class FSEventHandler():
         else:
             return "Unknown"
 
-
     def export_fsevent_report(self, outfile, row_count):
         """
         Export rows from fsevents table in DB to tab delimited report.
         """
         counter = 0
 
-        query = 'SELECT \
+        query = "SELECT \
                 id_hex, \
                 node_id, \
                 fs_uid, \
@@ -1221,7 +1435,7 @@ class FSEventHandler():
                 approx_dates_plus_minus_one_day, \
                 source, \
                 source_modified_time \
-                FROM fsevents_sorted_by_event_id'
+                FROM fsevents_sorted_by_event_id"
 
         SQL_TRAN.execute(query)
 
@@ -1247,11 +1461,10 @@ class FSEventHandler():
                         print(cell)
                         print(row)
                         values.append("ERROR_IN_VALUE")
-            m_row = '\t'.join(values)
-            m_row = m_row + '\n'
+            m_row = "\t".join(values)
+            m_row = m_row + "\n"
             outfile.write(m_row.encode("utf-8"))
             counter = counter + 1
-
 
     def export_sqlite_views(self):
         """
@@ -1266,7 +1479,7 @@ class FSEventHandler():
 
             query = "SELECT * FROM %s" % (i[0])
             SQL_TRAN.execute(query)
-            row = ' '
+            row = " "
             # Get outfile to write to
             outfile = getattr(self, "l_" + i[0])
             row = SQL_TRAN.fetchone()
@@ -1288,13 +1501,13 @@ class FSEventHandler():
                     except:
                         values.append("ERROR_IN_VALUE")
                         print("ERROR: ", row)
-                    m_row = '\t'.join(values)
-                    m_row = m_row + '\n'
+                    m_row = "\t".join(values)
+                    m_row = m_row + "\n"
                     outfile.write(m_row.encode("utf-8"))
                     row = SQL_TRAN.fetchone()
 
 
-class FsEventFileHeader():
+class FsEventFileHeader:
     """
     FSEvent file header structure.
         Each page within the decompressed begins with DLS1 or DLS2
@@ -1302,8 +1515,7 @@ class FsEventFileHeader():
     """
 
     def __init__(self, buf, filename):
-        """
-        """
+        """ """
         # Name and path of current source fsevent file
         self.src_fullpath = filename
         # Page header 'DLS1' or 'DLS2'
@@ -1324,9 +1536,9 @@ class FSEventRecord(dict):
     """
     FSEvent record structure.
     """
+
     def __init__(self, buf, offset, mask_hex):
-        """
-        """
+        """ """
         # Offset of the record within the fsevent file
         self.file_offset = offset
         # Raw record hex version
@@ -1334,14 +1546,11 @@ class FSEventRecord(dict):
         # Record wd or event id
         self.wd = struct.unpack("<Q", buf[0:8])[0]
         # Record wd_hex
-        wd_buf = struct.pack(">Q",self.wd)
+        wd_buf = struct.pack(">Q", self.wd)
 
         self.wd_hex = wd_buf.hex()
         # Enumerate mask flags, string version
-        self.mask = enumerate_flags(
-            struct.unpack(">I", buf[8:12])[0],
-            EVENTMASK
-        )
+        self.mask = enumerate_flags(struct.unpack(">I", buf[8:12])[0], EVENTMASK)
 
 
 class Output(dict):
@@ -1349,41 +1558,40 @@ class Output(dict):
     Output class handles outputting parsed
     fsevent records to report files.
     """
+
     COLUMNS = [
-                'id',
-                'id_hex',
-                'fullpath',
-                'filename',
-                'type',
-                'flags',
-                'approx_dates_plus_minus_one_day',
-                'mask',
-                'node_id',
-                'fs_uid',
-                'dls_version',
-                'record_end_offset',
-                'source',
-                'source_modified_time'
+        "id",
+        "id_hex",
+        "fullpath",
+        "filename",
+        "type",
+        "flags",
+        "approx_dates_plus_minus_one_day",
+        "mask",
+        "node_id",
+        "fs_uid",
+        "dls_version",
+        "record_end_offset",
+        "source",
+        "source_modified_time",
     ]
     R_COLUMNS = [
-                'id',
-                'node_id',
-                'fs_uid',
-                'fullpath',
-                'type',
-                'flags',
-                'approx_dates_plus_minus_one_day',
-                'source',
-                'source_modified_time'
+        "id",
+        "node_id",
+        "fs_uid",
+        "fullpath",
+        "type",
+        "flags",
+        "approx_dates_plus_minus_one_day",
+        "source",
+        "source_modified_time",
     ]
-
 
     def __init__(self, attribs):
         """
         Update column values.
         """
         self.update(attribs)
-
 
     @staticmethod
     def print_columns(outfile):
@@ -1392,21 +1600,20 @@ class Output(dict):
         """
         values = []
         for key in Output.R_COLUMNS:
-            #values.append(str(key))
+            # values.append(str(key))
             values.append(key)
-        row = '\t'.join(values)
+        row = "\t".join(values)
         row = "{}\n".format(row)
         row = row.encode("utf-8")
 
         outfile.write(row)
-
 
     def append_row(self):
         """
         Output parsed fsevents row to database.
         """
         values = []
-        vals_to_insert = ''
+        vals_to_insert = ""
 
         for key in Output.COLUMNS:
             values.append(str(self[key]))
@@ -1424,7 +1631,9 @@ def create_sqlite_db(self):
     Creates our output database for parsed records
     and connects to it.
     """
-    db_filename = os.path.join(self.meta['outdir'], self.meta['casename'], 'FSEvents.sqlite')
+    db_filename = os.path.join(
+        self.meta["outdir"], self.meta["casename"], "FSEvents.sqlite"
+    )
     table_schema = "CREATE TABLE [fsevents](\
                   [id] [INT] NULL, \
                   [id_hex] [TEXT] NULL, \
@@ -1440,8 +1649,8 @@ def create_sqlite_db(self):
                   [record_end_offset] [TEXT] NULL, \
                   [source] [TEXT] NULL, \
                   [source_modified_time] [TEXT] NULL)"
-    if not os.path.isdir(os.path.join(self.meta['outdir'], self.meta['casename'])):
-        os.makedirs(os.path.join(self.meta['outdir'], self.meta['casename']))
+    if not os.path.isdir(os.path.join(self.meta["outdir"], self.meta["casename"])):
+        os.makedirs(os.path.join(self.meta["outdir"], self.meta["casename"]))
 
     # If database already exists delete it
     try:
@@ -1450,9 +1659,13 @@ def create_sqlite_db(self):
         # Create database file if it doesn't exist
         db_is_new = not os.path.exists(db_filename)
     except:
-        print(("\nThe following output file is currently in use by "
-              "another program.\n -{}\nPlease ensure that the file is closed."
-              " Then rerun the parser.".format(db_filename)))
+        print(
+            (
+                "\nThe following output file is currently in use by "
+                "another program.\n -{}\nPlease ensure that the file is closed."
+                " Then rerun the parser.".format(db_filename)
+            )
+        )
         sys.exit(0)
 
     # Setup global
@@ -1466,9 +1679,9 @@ def create_sqlite_db(self):
         if self.r_queries:
             # Run queries in report queries list
             # to add report database views
-            for i in self.r_queries['process_list']:
+            for i in self.r_queries["process_list"]:
                 # Try to execute the query
-                cols = 'id, \
+                cols = "id, \
                     node_id, \
                     fs_uid, \
                     fullpath, \
@@ -1476,15 +1689,21 @@ def create_sqlite_db(self):
                     flags, \
                     approx_dates_plus_minus_one_day, \
                     source, \
-                    source_modified_time'
+                    source_modified_time"
 
-                query = i['query'].split("*")
+                query = i["query"].split("*")
                 query = query[0] + cols + query[1]
 
                 try:
                     SQL_CON.execute(query)
                 except Exception as exp:
-                    print(("SQLite error when executing query in json file. {}".format(str(exp))))
+                    print(
+                        (
+                            "SQLite error when executing query in json file. {}".format(
+                                str(exp)
+                            )
+                        )
+                    )
                     sys.exit(0)
 
     # Setup global
@@ -1498,7 +1717,8 @@ def insert_sqlite_db(vals_to_insert):
     """
     Insert parsed fsevent record values into database.
     """
-    insert_statement = "\
+    insert_statement = (
+        "\
         insert into fsevents (\
         [id], \
         [id_hex], \
@@ -1514,7 +1734,10 @@ def insert_sqlite_db(vals_to_insert):
         [record_end_offset], \
         [source], \
         [source_modified_time]\
-        ) values (" + vals_to_insert + ")"
+        ) values ("
+        + vals_to_insert
+        + ")"
+    )
 
     try:
         SQL_TRAN.execute(insert_statement)
@@ -1587,7 +1810,7 @@ def reorder_sqlite_db(self):
     return count
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     Init
     """
